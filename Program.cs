@@ -9,7 +9,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Set up the application to listen on the port specified by Render
-//builder.WebHost.UseUrls("http://*:" + Environment.GetEnvironmentVariable("PORT"));
+builder.WebHost.UseUrls("http://*:" + Environment.GetEnvironmentVariable("PORT"));
 
 // Add services to the container.
 builder.Services.AddControllers();
