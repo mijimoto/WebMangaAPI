@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WebMangaProject.DTO;
+using MangaAPI.DTO;
 
 namespace MangaAPI.Controllers
 {
@@ -113,6 +114,28 @@ namespace MangaAPI.Controllers
             _context.Mangas.Remove(manga);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+        // For Search Function
+        [HttpGet("search")]
+        public async Task<ActionResult<IEnumerable<MangaDTO>>> SearchManga([FromQuery] string query)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                return BadRequest(new { message = "Search query cannot be empty" });
+            }
+
+            var mangas = await _context.Mangas
+                .Where(m => EF.Functions.Like(m.Title, $"%{query}%"))
+                .Select(m => new MangaDTO
+                {
+                    MangaID = m.MangaID,
+                    Title = m.Title,
+                    Thumbnails = m.Thumbnails,
+                    Genres = m.Genres
+                })
+                .ToListAsync();
+
+            return Ok(mangas);
         }
     }
 }
