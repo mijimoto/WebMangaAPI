@@ -47,7 +47,7 @@ pipeline {
             dotnet sonarscanner begin ^
               /k:"WebMangaAPI" ^
               /d:sonar.login=${SONAR_TOKEN}
-            dotnet build WebMangaAPI.sln
+            dotnet build MangaAPI.sln
             dotnet sonarscanner end /d:sonar.login=${SONAR_TOKEN}
           """
         }
