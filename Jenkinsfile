@@ -4,13 +4,13 @@ pipeline {
   environment {
     // SonarQube settings
     SONARQUBE_NAME = 'MySonar'
-    SONAR_TOKEN    = credentials('sonar-token')         // Secret text ID for SonarQube
+    SONAR_TOKEN    = credentials('sonar-token')         // Jenkins > Credentials > Secret text
 
     // Docker Hub settings
-    DOCKER_CREDENTIALS = 'docker-creds'
-    DOCKER_REGISTRY    = 'https://index.docker.io/v1/'
-    IMAGE_NAMESPACE    = 'mijimoto'
-    IMAGE_TAG          = "${env.BUILD_NUMBER}"
+    DOCKER_CREDENTIALS = 'docker-creds'                // Jenkins > Credentials > DockerHub
+    DOCKER_REGISTRY    = 'https://index.docker.io/v1/' // DockerHub Registry URL
+    IMAGE_NAMESPACE    = 'mijimoto'                    // Your DockerHub username or org
+    IMAGE_TAG          = "${env.BUILD_NUMBER}"         // Use Jenkins build number as tag
   }
 
   stages {
@@ -43,11 +43,9 @@ pipeline {
       steps {
         echo '🔍 Running SonarQube scan...'
         withSonarQubeEnv("${SONARQUBE_NAME}") {
-          bat '''
-          C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner begin /k:"WebMangaAPI" /d:sonar.login=%SONAR_TOKEN%
-          dotnet build MangaAPI.sln
-          C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner end /d:sonar.login=%SONAR_TOKEN%
-          '''
+          bat "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner begin /k:\"WebMangaAPI\" /d:sonar.login=%SONAR_TOKEN%"
+          bat "dotnet build MangaAPI.sln"
+          bat "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner end /d:sonar.login=%SONAR_TOKEN%"
         }
       }
     }
@@ -57,9 +55,14 @@ pipeline {
         echo '🐳 Building and pushing Docker images...'
         script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-            def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
-            def feImage  = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
 
+            // Backend API image
+            def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
+
+            // Frontend image (in ./frontend directory)
+            def feImage = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
+
+            // Push both
             apiImage.push()
             feImage.push()
           }
