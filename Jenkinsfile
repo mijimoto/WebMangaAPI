@@ -3,24 +3,25 @@ pipeline {
 
   environment {
     // SonarQube settings
-    SONARQUBE_NAME = 'MySonar'                          // Name configured in Jenkins → SonarQube servers
-    SONAR_TOKEN    = credentials('sonar-token')         // Secret Text credential ID for Sonar token
+    SONARQUBE_NAME = 'MySonar'
+    SONAR_TOKEN    = credentials('sonar-token')         // Secret text ID for SonarQube
 
     // Docker Hub settings
-    DOCKER_CREDENTIALS = 'docker-creds'                 // Credential ID in Jenkins for Docker Hub
-    DOCKER_REGISTRY = 'https://index.docker.io/v1/'     // Docker Hub registry URL
-    IMAGE_NAMESPACE = 'mijimoto'                        // Your Docker Hub username or org
-    IMAGE_TAG = "${env.BUILD_NUMBER}"                   // Use Jenkins build number as tag
+    DOCKER_CREDENTIALS = 'docker-creds'
+    DOCKER_REGISTRY    = 'https://index.docker.io/v1/'
+    IMAGE_NAMESPACE    = 'mijimoto'
+    IMAGE_TAG          = "${env.BUILD_NUMBER}"
   }
 
   stages {
+
     stage('Checkout API') {
       steps {
         echo '📦 Checking out WebMangaAPI...'
         git(
           url: 'https://github.com/mijimoto/WebMangaAPI.git',
           branch: 'main',
-          credentialsId: 'github-creds'                 // GitHub credential ID
+          credentialsId: 'github-creds'
         )
       }
     }
@@ -42,14 +43,11 @@ pipeline {
       steps {
         echo '🔍 Running SonarQube scan...'
         withSonarQubeEnv("${SONARQUBE_NAME}") {
-          // Use `bat` for Windows shell
-          bat """
-            dotnet sonarscanner begin ^
-              /k:"WebMangaAPI" ^
-              /d:sonar.login=${SONAR_TOKEN}
-            dotnet build MangaAPI.sln
-            dotnet sonarscanner end /d:sonar.login=${SONAR_TOKEN}
-          """
+          bat '''
+          C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner begin /k:"WebMangaAPI" /d:sonar.login=%SONAR_TOKEN%
+          dotnet build MangaAPI.sln
+          C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner end /d:sonar.login=%SONAR_TOKEN%
+          '''
         }
       }
     }
@@ -59,14 +57,9 @@ pipeline {
         echo '🐳 Building and pushing Docker images...'
         script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-
-            // Backend API image
             def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
+            def feImage  = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
 
-            // Frontend image (in ./frontend directory)
-            def feImage = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
-
-            // Push both
             apiImage.push()
             feImage.push()
           }
