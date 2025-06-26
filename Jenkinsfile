@@ -1,85 +1,54 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    // SonarQube settings
-    SONARQUBE_NAME = 'MySonar'
-    SONAR_TOKEN    = credentials('sonar-token')         // Jenkins > Credentials > Secret text
-
-    // Docker Hub settings
-    DOCKER_CREDENTIALS = 'docker-creds'                // Jenkins > Credentials > DockerHub
-    DOCKER_REGISTRY    = 'https://index.docker.io/v1/' // DockerHub Registry URL
-    IMAGE_NAMESPACE    = 'mijimoto'                    // Your DockerHub username or org
-    IMAGE_TAG          = "${env.BUILD_NUMBER}"         // Use Jenkins build number as tag
-  }
-
-  stages {
-
-    stage('Checkout API') {
-      steps {
-        echo '📦 Checking out WebMangaAPI...'
-        git(
-          url: 'https://github.com/mijimoto/WebMangaAPI.git',
-          branch: 'main',
-          credentialsId: 'github-creds'
-        )
-      }
+    environment {
+        SONARQUBE_ENV = 'MySonar'
+        DOCKER_IMAGE = 'ghcr.io/mijimoto/webmangaapi:latest'
     }
 
-    stage('Checkout Frontend') {
-      steps {
-        echo '🌐 Checking out WebManga (frontend)...'
-        dir('frontend') {
-          git(
-            url: 'https://github.com/mijimoto/WebManga.git',
-            branch: 'main',
-            credentialsId: 'github-creds'
-          )
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: 'github-creds', url: 'https://github.com/mijimoto/WebMangaAPI.git'
+            }
         }
-      }
-    }
 
-    stage('SonarQube Scan') {
-      steps {
-        echo '🔍 Running SonarQube scan...'
-        withSonarQubeEnv("${SONARQUBE_NAME}") {
-          // Using bat for Windows - safe method
-          bat "\"C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner\" begin /k:\"WebMangaAPI\" /d:sonar.login=%SONAR_TOKEN%"
-          bat "dotnet build MangaAPI.sln"
-          bat "\"C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner\" end /d:sonar.login=%SONAR_TOKEN%"
+        stage('SonarQube Code Scan') {
+            steps {
+                withSonarQubeEnv(SONARQUBE_ENV) {
+                    bat "dotnet sonarscanner begin /k:\"webmangaapi\" /d:sonar.login=$SONAR_TOKEN"
+                    bat "dotnet build"
+                    bat "dotnet sonarscanner end /d:sonar.login=$SONAR_TOKEN"
+                }
+            }
         }
-      }
-    }
 
-    stage('Build and Push Docker Images') {
-      steps {
-        echo '🐳 Building and pushing Docker images...'
-        script {
-          docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-
-            // Backend API image
-            def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
-
-            // Frontend image (in ./frontend directory)
-            def feImage = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
-
-            // Push both
-            apiImage.push()
-            feImage.push()
-          }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("webmangaapi")
+                }
+            }
         }
-      }
-    }
-  }
 
-  post {
-    success {
-      echo "✅ Build #${env.BUILD_NUMBER} completed successfully!"
+        stage('Push to GHCR') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'ghcr-token', variable: 'GHCR_TOKEN')]) {
+                        sh '''
+                            echo $GHCR_TOKEN | docker login ghcr.io -u mijimoto --password-stdin
+                            docker tag webmangaapi ghcr.io/mijimoto/webmangaapi:latest
+                            docker push ghcr.io/mijimoto/webmangaapi:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Run Image (Optional)') {
+            steps {
+                sh 'docker run -d -p 8081:80 ghcr.io/mijimoto/webmangaapi:latest'
+            }
+        }
     }
-    failure {
-      echo "❌ Build failed. Check console output for errors."
-    }
-  }
 }
-
-
