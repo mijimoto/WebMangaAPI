@@ -42,15 +42,12 @@ pipeline {
       steps {
         echo '🔍 Running SonarQube scan...'
         withSonarQubeEnv("${SONARQUBE_NAME}") {
-          powershell '''
-            & "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" begin `
-              /k:"WebMangaAPI" `
-              /d:sonar.login=$env:SONAR_TOKEN
-
-            dotnet build MangaAPI.sln
-
-            & "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" end `
-              /d:sonar.login=$env:SONAR_TOKEN
+          bat '''
+          setlocal enabledelayedexpansion
+          set SONAR_TOKEN=%SONAR_TOKEN%
+          "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" begin /k:"WebMangaAPI" /d:sonar.login=%SONAR_TOKEN%
+          dotnet build MangaAPI.sln
+          "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" end /d:sonar.login=%SONAR_TOKEN%
           '''
         }
       }
@@ -61,7 +58,6 @@ pipeline {
         echo '🐳 Building and pushing Docker images...'
         script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-
             def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
             def feImage  = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
 
