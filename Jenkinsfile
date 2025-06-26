@@ -14,6 +14,7 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout API') {
       steps {
         echo '📦 Checking out WebMangaAPI...'
@@ -42,13 +43,10 @@ pipeline {
       steps {
         echo '🔍 Running SonarQube scan...'
         withSonarQubeEnv("${SONARQUBE_NAME}") {
-          bat '''
-          setlocal enabledelayedexpansion
-          set SONAR_TOKEN=%SONAR_TOKEN%
-          "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" begin /k:"WebMangaAPI" /d:sonar.login=%SONAR_TOKEN%
-          dotnet build MangaAPI.sln
-          "C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner" end /d:sonar.login=%SONAR_TOKEN%
-          '''
+          // Using bat for Windows - safe method
+          bat "\"C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner\" begin /k:\"WebMangaAPI\" /d:sonar.login=%SONAR_TOKEN%"
+          bat "dotnet build MangaAPI.sln"
+          bat "\"C:\\Users\\Admin\\.dotnet\\tools\\dotnet-sonarscanner\" end /d:sonar.login=%SONAR_TOKEN%"
         }
       }
     }
@@ -58,9 +56,14 @@ pipeline {
         echo '🐳 Building and pushing Docker images...'
         script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS}") {
-            def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
-            def feImage  = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
 
+            // Backend API image
+            def apiImage = docker.build("${IMAGE_NAMESPACE}/webmanga-api:${IMAGE_TAG}", ".")
+
+            // Frontend image (in ./frontend directory)
+            def feImage = docker.build("${IMAGE_NAMESPACE}/webmanga-frontend:${IMAGE_TAG}", "frontend")
+
+            // Push both
             apiImage.push()
             feImage.push()
           }
@@ -78,4 +81,5 @@ pipeline {
     }
   }
 }
+
 
